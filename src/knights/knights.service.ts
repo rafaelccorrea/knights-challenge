@@ -134,14 +134,22 @@ export class KnightsService {
       throw new NotFoundException(`Knight with id ${id} not found`);
     }
 
-    knight.toObject({ getters: true });
+    const redisKeyType = await this.redisClient.type('heroes-knights');
 
-    await this.redisClient.set('heroes-knights', JSON.stringify(knight));
+    if (redisKeyType !== 'list') {
+      await this.redisClient.del('heroes-knights');
+    }
+
+    await this.redisClient.rpush(
+      'heroes-knights',
+      JSON.stringify(knight.toObject({ getters: true })),
+    );
 
     const deletedKnight = await this.knightModel.deleteOne({ _id: id }).exec();
 
-    if (deletedKnight.deletedCount === 1)
+    if (deletedKnight.deletedCount === 1) {
       return { message: 'Knight fought the good fight!' };
+    }
   }
 
   async getByIdKnight(id: string) {
@@ -214,29 +222,33 @@ export class KnightsService {
     const result = await this.knightPaginateModel.paginate({}, options);
 
     if (filter.term === 'heroes') {
-      const cachedKnights = await this.redisClient.get('heroes-knights');
-      if (!cachedKnights) {
+      const cachedKnights = await this.redisClient.lrange(
+        'heroes-knights',
+        0,
+        -1,
+      );
+
+      if (!cachedKnights || !cachedKnights.length) {
         throw new BadRequestException('Not found heroes!');
       }
-      const heroKnights = JSON.parse(cachedKnights);
 
-      const heroes = [heroKnights].map((heroKnight) => {
-        return {
-          name: heroKnight.name,
-          nickname: heroKnight.nickname,
-          age: calculateAge(heroKnight.birthday),
-          weapons: heroKnight.weapons.length,
-          attribute: heroKnight.keyAttribute,
-          attack: calculateAttack(heroKnight),
-          exp: calculateExp(parseISO(heroKnight.birthday)),
-        };
-      });
+      const parsedKnights = cachedKnights.map((knight) => JSON.parse(knight));
+
+      const result = parsedKnights.map((heroKnights) => ({
+        name: heroKnights.name,
+        nickname: heroKnights.nickname,
+        age: calculateAge(heroKnights.birthday),
+        weapons: heroKnights.weapons.length,
+        attribute: heroKnights.keyAttribute,
+        attack: 0,
+        exp: calculateExp(parseISO(heroKnights.birthday)),
+      }));
 
       const response: ListKnightsResponse = {
-        total: heroes.length,
+        total: parsedKnights.length,
         currentPage: 1,
         pageSize: 10,
-        data: heroes,
+        data: result,
       };
 
       return response;
