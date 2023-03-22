@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { differenceInYears, parseISO } from 'date-fns';
+import { differenceInYears, format, parseISO } from 'date-fns';
 import { Model, PaginateModel } from 'mongoose';
 import { RedisService } from 'src/redis/redis';
 import { CreateKnightDto } from './dto/create-knight.dto';
@@ -51,13 +51,17 @@ const calculateAge = (birthday) => {
 
 function calculateAttack(character: any): number {
   const keyAttr = character?.keyAttribute;
-  const equippedWeapon = character.weapons.find((weapon) => weapon.equipped);
-  const att =
-    character.attributes[keyAttr] !== undefined
-      ? character.attributes[keyAttr]
-      : character.attributes.get(keyAttr);
-  const attack = 10 + calculateAttributeMod(att) + equippedWeapon.mod;
-  return attack;
+  const age = calculateAge(character.birthday);
+  if (age > 7) {
+    const equippedWeapon = character.weapons.find((weapon) => weapon.equipped);
+    const att =
+      character.attributes[keyAttr] !== undefined
+        ? character.attributes[keyAttr]
+        : character.attributes.get(keyAttr);
+    const attack = 10 + calculateAttributeMod(att) + equippedWeapon.mod;
+    return attack;
+  }
+  return 0;
 }
 
 @Injectable()
@@ -98,6 +102,8 @@ export class KnightsService {
 
       if (equippedWeapons.length === 0)
         throw new BadRequestException('You must equip at least one weapon!');
+
+      knight.birthday = format(parseISO(knight.birthday), 'dd-MM-yyyy');
 
       const newKnight = new this.knightModel(knight);
       const savedKnight = await newKnight.save();
@@ -162,19 +168,15 @@ export class KnightsService {
       keyAttribute: knight.keyAttribute,
       attributes: knight.attributes,
       weapons: knight.weapons,
+      birthday: knight.birthday,
     };
 
     const attack = calculateAttack(character);
 
-    const ageInMilliseconds = Date.now() - new Date(knight.birthday).getTime();
-    const ageInYears = Math.floor(
-      ageInMilliseconds / (1000 * 60 * 60 * 24 * 365),
-    );
-
     return {
       name: knight.name,
       nickname: knight.nickname,
-      age: ageInYears,
+      age: calculateAge(knight.birthday),
       exp: calculateExp(knight.birthday),
       attack,
       weapons,
