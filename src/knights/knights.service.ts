@@ -107,8 +107,6 @@ export class KnightsService {
       if (equippedWeapons.length === 0)
         throw new BadRequestException('You must equip at least one weapon!');
 
-      knight.birthday = format(parseISO(knight.birthday), 'dd-MM-yyyy');
-
       const newKnight = new this.knightModel(knight);
       const savedKnight = await newKnight.save();
 
