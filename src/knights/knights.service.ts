@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { differenceInYears, format, parseISO } from 'date-fns';
+import { parseISO } from 'date-fns';
 import { Model, PaginateModel } from 'mongoose';
 import { RedisService } from 'src/redis/redis';
 import { CreateKnightDto } from './dto/create-knight.dto';
@@ -220,21 +220,23 @@ export class KnightsService {
       }
       const heroKnights = JSON.parse(cachedKnights);
 
-      const result = {
-        name: heroKnights.name,
-        nickname: heroKnights.nickname,
-        age: calculateAge(heroKnights.birthday),
-        weapons: heroKnights.weapons.length,
-        attribute: heroKnights.keyAttribute,
-        attack: calculateAttack(heroKnights),
-        exp: calculateExp(parseISO(heroKnights.birthday)),
-      };
+      const heroes = [heroKnights].map((heroKnight) => {
+        return {
+          name: heroKnight.name,
+          nickname: heroKnight.nickname,
+          age: calculateAge(heroKnight.birthday),
+          weapons: heroKnight.weapons.length,
+          attribute: heroKnight.keyAttribute,
+          attack: calculateAttack(heroKnight),
+          exp: calculateExp(parseISO(heroKnight.birthday)),
+        };
+      });
 
       const response: ListKnightsResponse = {
-        total: 0,
+        total: heroes.length,
         currentPage: 1,
         pageSize: 10,
-        data: result,
+        data: heroes,
       };
 
       return response;
