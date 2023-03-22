@@ -37,8 +37,12 @@ const calculateAttributeMod = (value: number): number => {
 };
 
 const calculateExp = (birthday) => {
-  const ageDifference = differenceInYears(new Date(), birthday) - 7;
-  return ageDifference > 7 ? Math.floor(ageDifference * Math.pow(22, 1.45)) : 0;
+  const age = calculateAge(birthday);
+  let experience = 0;
+  if (age >= 7) {
+    experience = Math.floor((age - 7) * Math.pow(22, 1.45));
+  }
+  return experience;
 };
 
 const calculateAge = (birthday) => {
